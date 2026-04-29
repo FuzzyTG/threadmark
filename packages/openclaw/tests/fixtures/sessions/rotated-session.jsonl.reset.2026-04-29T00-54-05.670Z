@@ -1,0 +1,6 @@
+{"type":"message","message":{"role":"user","content":"threadmark validation marker reset 1"}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"I will continue the validation."}]}}
+{"type":"message","message":{"role":"user","content":"/reset"}}
+{"type":"tool_result","content":"ignored"}
+{"type":"message","message":{"role":"assistant","content":"[Post-compaction context refresh] ignored marker"}}
+{"type":"message","message":{"role":"user","content":[{"type":"text","text":"same as before"}]}}

@@ -1,0 +1,26 @@
+{
+  "name": "threadmark",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/core",
+    "packages/openclaw"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "check": "npm run build && npm run test"
+  },
+  "openclaw": {
+    "hooks": ["./packages/openclaw/dist/hooks/threadmark"],
+    "extensions": ["./packages/openclaw/dist/src/plugin.js"]
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

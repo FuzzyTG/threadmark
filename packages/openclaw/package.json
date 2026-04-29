@@ -1,0 +1,19 @@
+{
+  "name": "@threadmark/openclaw",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/src/plugin.js",
+  "types": "dist/src/plugin.d.ts",
+  "scripts": {
+    "build": "tsc -b tsconfig.json && mkdir -p dist/hooks/threadmark && cp hooks/threadmark/HOOK.md dist/hooks/threadmark/HOOK.md",
+    "test": "node --test dist/tests/*.test.js",
+    "check": "npm run build && npm test"
+  },
+  "dependencies": {
+    "@threadmark/core": "file:../core"
+  },
+  "openclaw": {
+    "hooks": ["./dist/hooks/threadmark"],
+    "extensions": ["./dist/src/plugin.js"]
+  }
+}
