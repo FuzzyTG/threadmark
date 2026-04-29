@@ -1,6 +1,6 @@
 # Threadmark
 
-![Threadmark comic: preserving recent context across new sessions](docs/assets/threadmark-comic.svg)
+![Threadmark comic: preserving recent context across new sessions](docs/assets/threadmark.png)
 
 Threadmark preserves a small active/recent context packet across agent session boundaries so vague follow-ups can be grounded safely.
 
