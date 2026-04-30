@@ -73,11 +73,13 @@ set -euo pipefail
 
 YES=0
 DRY_RUN=0
+UPGRADE=0
 
 for arg in "$@"; do
   case "$arg" in
     --yes) YES=1 ;;
     --dry-run) DRY_RUN=1 ;;
+    --upgrade) UPGRADE=1 ;;
     *) echo "Unknown argument: $arg" >&2; exit 2 ;;
   esac
 done
@@ -87,6 +89,9 @@ OPENCLAW_BIN="${OPENCLAW_BIN:-openclaw}"
 OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
 
 echo "Threadmark OpenClaw adapter install plan:"
+if [ "$UPGRADE" -eq 1 ]; then
+  echo "- mode: upgrade (uninstall existing, then clean install)"
+fi
 echo "- install managed hook package from artifact directory: $ARTIFACT_DIR"
 echo "- install plugin package from artifact directory: $ARTIFACT_DIR"
 echo "- atomic: if plugin install fails, rollback hooks before exiting"
@@ -105,6 +110,27 @@ fi
 if [ "$YES" -ne 1 ]; then
   echo "Refusing to install without --yes."
   exit 1
+fi
+
+# Check for existing install
+EXISTING=0
+if [ -d "$OPENCLAW_HOME/hooks/threadmark" ] || [ -d "$OPENCLAW_HOME/extensions/threadmark" ]; then
+  EXISTING=1
+fi
+
+if [ "$EXISTING" -eq 1 ] && [ "$UPGRADE" -eq 0 ]; then
+  echo "threadmark is already installed. To upgrade, run: ./install.sh --upgrade --yes" >&2
+  exit 1
+fi
+
+# Upgrade: uninstall existing installation first
+if [ "$UPGRADE" -eq 1 ]; then
+  echo "Removing existing threadmark installation..."
+  "$OPENCLAW_BIN" hooks disable threadmark 2>/dev/null || true
+  "$OPENCLAW_BIN" plugins uninstall threadmark --force 2>/dev/null || true
+  rm -rf "$OPENCLAW_HOME/hooks/threadmark"
+  rm -rf "$OPENCLAW_HOME/extensions/threadmark"
+  echo "Existing installation removed."
 fi
 
 # Normalize ownership when running as root

@@ -39,13 +39,20 @@ cd threadmark-openclaw-v*/
 ./install.sh --yes       # install hooks and plugin
 ```
 
-> **For AI agents:** Run `./install.sh --yes` directly. Do NOT read the script and run individual `openclaw` commands manually — the install order matters and partial runs corrupt the gateway config.
+> **For AI agents:** Run `./install.sh --yes` for fresh installs, or `./install.sh --upgrade --yes` to upgrade an existing installation. Do NOT read the script and run individual `openclaw` commands manually — the install order matters and partial runs corrupt the gateway config.
 
 Restart the OpenClaw gateway after install. Verify:
 
 ```sh
 openclaw hooks list      # should show threadmark
 openclaw plugins list    # should show threadmark loaded
+```
+
+To upgrade an existing installation:
+
+```sh
+./install.sh --upgrade --dry-run   # preview
+./install.sh --upgrade --yes       # uninstall existing, then clean install
 ```
 
 To uninstall:
