@@ -21,6 +21,17 @@ Threadmark does not write archival memory or run `openclaw memory index`.
 - Injects `RECENT_CONTEXT.md` during OpenClaw `agent:bootstrap`.
 - Treats `before_compaction` as a signal-only path unless a transcript becomes available later.
 
+## Relationship to OpenClaw `session-memory`
+
+OpenClaw already includes a bundled hook named `session-memory`. Threadmark is not intended to duplicate that hook.
+
+The distinction is:
+
+- Bundled `session-memory` runs on `/new`, saves about 15 recent messages into `memory/YYYY-MM-DD-slug.md`, and makes that file available to OpenClaw's memory search/indexing path.
+- Threadmark runs on `/new` and `/reset`, writes a small `RECENT_CONTEXT.md` packet, and injects it into the next session's bootstrap context so vague follow-ups like “continue” have recent context immediately.
+
+Threadmark should stay focused on immediate session continuity. It does not replace bundled `session-memory`, write archival memory, or run `openclaw memory index`.
+
 ## Manual Validation
 
 Use a non-production OpenClaw instance when possible. If validating on a daily instance, back up OpenClaw config first and proceed one step at a time.
