@@ -13,6 +13,21 @@ Threadmark does not write archival memory or run `openclaw memory index`.
 - Captures `/new` and `/reset` from OpenClaw session transcripts.
 - Injects `RECENT_CONTEXT.md` during OpenClaw `agent:bootstrap`.
 
+## Compaction behavior
+
+OpenClaw has two compaction code paths that provide different data to the `before_compaction` hook:
+
+| Path | `messages` | `sessionFile` | `sessionId` |
+|---|---|---|---|
+| Auto-compaction (subscribe handler) | yes | yes | no |
+| Explicit compaction (compact runner) | no | no | yes |
+
+Threadmark tries to capture the best context available:
+
+1. If `messages` are provided, extract context directly from them.
+2. Otherwise, if `sessionFile` or `sessionId` is available, resolve and read the transcript file.
+3. Otherwise, record a partial capture (signal-only).
+
 ## Install
 
 Download the latest release tarball from the [Releases page](../../releases).
