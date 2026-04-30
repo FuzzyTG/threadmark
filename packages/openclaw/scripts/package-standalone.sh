@@ -57,7 +57,7 @@ cp -r "$CORE_SRC/dist/src" "$CORE_DEST/dist/src"
 node -e "
 const pkg = require('$PACKAGE_DIR/package.json');
 const out = {
-  name: pkg.name,
+  name: 'threadmark',
   version: pkg.version,
   type: pkg.type,
   main: pkg.main || 'dist/src/plugin.js',
@@ -84,10 +84,12 @@ done
 
 ARTIFACT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OPENCLAW_BIN="${OPENCLAW_BIN:-openclaw}"
+OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
 
 echo "Threadmark OpenClaw adapter install plan:"
 echo "- install managed hook package from artifact directory: $ARTIFACT_DIR"
 echo "- install plugin package from artifact directory: $ARTIFACT_DIR"
+echo "- atomic: if plugin install fails, rollback hooks before exiting"
 echo "- use OpenClaw CLI only; no direct config edits"
 
 if [ "$DRY_RUN" -eq 1 ]; then
@@ -105,8 +107,27 @@ if [ "$YES" -ne 1 ]; then
   exit 1
 fi
 
+# Normalize ownership when running as root
+if [ "$(id -u)" -eq 0 ]; then
+  chown -R 0:0 "$ARTIFACT_DIR"
+fi
+
 "$OPENCLAW_BIN" hooks install "$ARTIFACT_DIR"
-"$OPENCLAW_BIN" plugins install "$ARTIFACT_DIR"
+
+if ! "$OPENCLAW_BIN" plugins install "$ARTIFACT_DIR" 2>/dev/null; then
+  # OpenClaw may copy extension files but fail config validation in the same
+  # process. If the plugin is now discoverable, enable it as a workaround.
+  echo "Recovering from known OpenClaw install ordering issue..."
+  if "$OPENCLAW_BIN" plugins enable threadmark 2>/dev/null; then
+    echo "Plugin enabled successfully."
+  else
+    echo "Plugin install failed; rolling back hooks..." >&2
+    "$OPENCLAW_BIN" hooks disable threadmark || true
+    rm -rf "$OPENCLAW_HOME/hooks/threadmark"
+    rm -rf "$OPENCLAW_HOME/extensions/threadmark"
+    exit 1
+  fi
+fi
 
 echo "Install complete. Restart OpenClaw gateway to load Threadmark."
 INSTALL_EOF
@@ -118,28 +139,37 @@ cat > "$STAGE_DIR/uninstall.sh" << 'UNINSTALL_EOF'
 set -euo pipefail
 
 YES=0
+DRY_RUN=0
 
 for arg in "$@"; do
   case "$arg" in
     --yes) YES=1 ;;
+    --dry-run) DRY_RUN=1 ;;
     *) echo "Unknown argument: $arg" >&2; exit 2 ;;
   esac
 done
 
 OPENCLAW_BIN="${OPENCLAW_BIN:-openclaw}"
+OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
+
+echo "Threadmark OpenClaw adapter uninstall plan:"
+echo "- disable managed hook: threadmark"
+echo "- disable plugin: threadmark"
+echo "- remove hook files from $OPENCLAW_HOME/hooks/threadmark"
+echo "- remove extension files from $OPENCLAW_HOME/extensions/threadmark"
+
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo "Dry run only. No changes made."
+  exit 0
+fi
 
 if ! command -v "$OPENCLAW_BIN" >/dev/null 2>&1; then
   echo "openclaw command not found. Set OPENCLAW_BIN=/path/to/openclaw." >&2
   exit 1
 fi
 
-echo "Threadmark OpenClaw adapter cleanup plan:"
-echo "- disable managed hook: threadmark"
-echo "- disable plugin: threadmark"
-echo "- keep ~/.openclaw/continuity logs/state unless removed manually"
-
 if [ "$YES" -ne 1 ]; then
-  echo "Refusing to disable without --yes."
+  echo "Refusing to uninstall without --yes."
   exit 1
 fi
 
@@ -150,17 +180,21 @@ if ! "$OPENCLAW_BIN" hooks disable threadmark; then
   FAILED=1
 fi
 
-if ! "$OPENCLAW_BIN" plugins disable threadmark; then
-  echo "Failed to disable plugin: threadmark" >&2
+if ! "$OPENCLAW_BIN" plugins uninstall threadmark --force; then
+  echo "Failed to uninstall plugin: threadmark" >&2
   FAILED=1
 fi
 
+# Clean up any remaining files
+rm -rf "$OPENCLAW_HOME/hooks/threadmark"
+rm -rf "$OPENCLAW_HOME/extensions/threadmark"
+
 if [ "$FAILED" -ne 0 ]; then
-  echo "Disable incomplete. Check OpenClaw CLI output above." >&2
+  echo "Uninstall incomplete. Check OpenClaw CLI output above." >&2
   exit 1
 fi
 
-echo "Disable complete. Restart OpenClaw gateway to apply."
+echo "Uninstall complete. Restart OpenClaw gateway to apply."
 UNINSTALL_EOF
 chmod +x "$STAGE_DIR/uninstall.sh"
 
@@ -168,6 +202,11 @@ chmod +x "$STAGE_DIR/uninstall.sh"
 find "$STAGE_DIR" -name "*.js.map" -delete
 
 # ── 10. Create tarball with single top-level directory ────────────────────────
-(cd "$REPO_ROOT/dist/standalone" && tar -czf "$TARBALL" "$ARTIFACT_NAME")
+# GNU tar supports --owner/--group; BSD tar (macOS) does not.
+if tar --owner=0 --group=0 -cf /dev/null /dev/null 2>/dev/null; then
+  (cd "$REPO_ROOT/dist/standalone" && tar --owner=0 --group=0 -czf "$TARBALL" "$ARTIFACT_NAME")
+else
+  (cd "$REPO_ROOT/dist/standalone" && tar -czf "$TARBALL" "$ARTIFACT_NAME")
+fi
 
 echo "Packaging complete: $TARBALL"

@@ -57,12 +57,20 @@ test("standalone package archive installs from extracted artifact layout", async
   const extractDir = await fs.mkdtemp(path.join(os.tmpdir(), "threadmark-standalone-"));
   await execFileAsync("tar", ["-xzf", tarball, "-C", extractDir]);
   const artifactDir = path.join(extractDir, artifactName);
+  const artifactPackage = JSON.parse(await fs.readFile(path.join(artifactDir, "package.json"), "utf-8"));
+  assert.equal(artifactPackage.name, "threadmark");
 
   await execFileAsync(process.execPath, ["--input-type=module", "-e", "await import('@threadmark/core')"], { cwd: artifactDir });
 
   const { stdout: dryRun } = await execFileAsync("./install.sh", ["--dry-run"], { cwd: artifactDir });
   assert.match(dryRun, /install managed hook package from artifact directory/);
   assert.match(dryRun, /install plugin package from artifact directory/);
+  assert.match(dryRun, /atomic.*rollback|rollback.*atomic|rollback/);
   assert.doesNotMatch(dryRun, /npm run check/);
   assert.doesNotMatch(dryRun, /repo root/);
+
+  const { stdout: uninstallDryRun } = await execFileAsync("./uninstall.sh", ["--dry-run"], { cwd: artifactDir });
+  assert.match(uninstallDryRun, /remove hook files/);
+  assert.match(uninstallDryRun, /remove extension files/);
+  assert.doesNotMatch(uninstallDryRun, /continuity/);
 });
