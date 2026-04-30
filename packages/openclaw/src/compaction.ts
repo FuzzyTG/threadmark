@@ -7,14 +7,13 @@ export type CompactionEvent = {
   tokenCount?: number;
   sessionFile?: string;
   messages?: unknown[];
-};
-
-export type CompactionAgentContext = {
   sessionKey?: string;
   sessionId?: string;
   workspaceDir?: string;
   agentId?: string;
 };
+
+export type CompactionAgentContext = Pick<CompactionEvent, "sessionKey" | "sessionId" | "workspaceDir" | "agentId">;
 
 function extractMessages(raw: unknown[]): TranscriptMessage[] {
   const results: TranscriptMessage[] = [];
@@ -44,14 +43,16 @@ export async function handleCompactionSignal(
   event: CompactionEvent,
   ctx: CompactionAgentContext = {}
 ): Promise<void> {
+  const merged = { ...event, ...ctx };
+
   // Path 1: messages provided directly (auto-compaction)
-  if (Array.isArray(event.messages) && event.messages.length > 0) {
-    const messages = extractMessages(event.messages);
+  if (Array.isArray(merged.messages) && merged.messages.length > 0) {
+    const messages = extractMessages(merged.messages);
     const status = messages.length > 0 ? "success" as const : "partial" as const;
     const staleReason = messages.length > 0 ? null : "compaction messages could not be parsed";
     const state = extractContinuityState({
       eventName: "before_compaction",
-      sessionId: ctx.sessionId ?? null,
+      sessionId: merged.sessionId ?? null,
       messages,
       now: new Date(),
       status,
@@ -62,12 +63,12 @@ export async function handleCompactionSignal(
   }
 
   // Path 2: sessionFile or sessionId available — try transcript resolution
-  if (event.sessionFile || ctx.sessionId) {
+  if (merged.sessionFile || merged.sessionId) {
     await captureContinuity({
       eventName: "before_compaction",
-      sessionId: ctx.sessionId ?? null,
-      sessionFile: event.sessionFile ?? null,
-      workspaceDir: ctx.workspaceDir ?? null,
+      sessionId: merged.sessionId ?? null,
+      sessionFile: merged.sessionFile ?? null,
+      workspaceDir: merged.workspaceDir ?? null,
       now: new Date()
     });
     return;

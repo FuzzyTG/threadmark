@@ -81,6 +81,22 @@ test("compaction with only sessionId attempts transcript resolution", async () =
   delete process.env.OPENCLAW_HOME;
 });
 
+test("compaction accepts OpenClaw single-argument context shape", async () => {
+  const base = await makeTmpHome();
+
+  await handleCompactionSignal({
+    messageCount: 10,
+    sessionId: "sess-one-arg",
+    workspaceDir: "/tmp/threadmark-workspace"
+  });
+
+  const state = JSON.parse(await fs.readFile(statePath(base), "utf-8"));
+  assert.equal(state.meta.last_capture_event, "before_compaction");
+  assert.equal(state.meta.last_capture_status, "partial");
+  assert.equal(state.meta.stale_reason, "transcript missing");
+  delete process.env.OPENCLAW_HOME;
+});
+
 test("compaction with no transcript info writes partial state", async () => {
   const base = await makeTmpHome();
 
@@ -93,7 +109,7 @@ test("compaction with no transcript info writes partial state", async () => {
   delete process.env.OPENCLAW_HOME;
 });
 
-test("plugin registers before_compaction with event and ctx", () => {
+test("plugin registers before_compaction handler", () => {
   const calls: Array<{ name: string; handler: unknown }> = [];
   const api = { on: (name: string, handler: unknown) => calls.push({ name, handler }) };
 
