@@ -20,10 +20,11 @@ function extractText(content: unknown): string | null {
 }
 
 function extractExternalUserText(text: string): string | null {
+  const metaStart = text.indexOf("Conversation info (untrusted metadata):");
+  if (metaStart === -1 || !text.includes("\nSender (untrusted metadata):")) return null;
+
   const metadataEnd = text.lastIndexOf("```\n\n");
-  if (!text.startsWith("Conversation info (untrusted metadata):") || !text.includes("\nSender (untrusted metadata):") || metadataEnd === -1) {
-    return null;
-  }
+  if (metadataEnd === -1) return null;
 
   const userText = text.slice(metadataEnd + "```\n\n".length).trim();
   return userText.length > 0 ? userText : null;

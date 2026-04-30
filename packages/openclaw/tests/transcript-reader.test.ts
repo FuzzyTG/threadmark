@@ -28,6 +28,12 @@ Sender (untrusted metadata):
 ${text}`;
 }
 
+function slackRelayUserText(text: string): string {
+  return `System: [2026-04-30 16:40:49 GMT+8] Slack DM from TestUser: ${text}
+
+${externalUserText(text)}`;
+}
+
 test("readTranscriptMessages extracts user and assistant text and skips slash commands", async () => {
   const file = path.join(
     process.cwd(),
@@ -69,5 +75,23 @@ test("readTranscriptMessages keeps only external human user messages", async () 
   assert.deepEqual(messages, [
     { role: "user", text: "Please check the sample city weather" },
     { role: "user", text: "Can you do it again?" }
+  ]);
+});
+
+test("readTranscriptMessages extracts user text from Slack relay format with System: prefix", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "threadmark-slack-"));
+  const file = path.join(dir, "session.jsonl");
+  const entries = [
+    { type: "message", message: { role: "user", content: slackRelayUserText("分析下今天的南京天气") } },
+    { type: "message", message: { role: "assistant", content: "南京今天多云转晴。" } },
+    { type: "message", message: { role: "user", content: slackRelayUserText("谢谢") } }
+  ];
+  await fs.writeFile(file, entries.map((entry) => JSON.stringify(entry)).join("\n"), "utf-8");
+
+  const messages = await readTranscriptMessages(file, 10);
+
+  assert.deepEqual(messages, [
+    { role: "user", text: "分析下今天的南京天气" },
+    { role: "user", text: "谢谢" }
   ]);
 });
