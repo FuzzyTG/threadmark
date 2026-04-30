@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc -b tsconfig.json && mkdir -p dist/hooks/threadmark && cp hooks/threadmark/HOOK.md dist/hooks/threadmark/HOOK.md",
     "test": "node --test dist/tests/*.test.js",
-    "check": "npm run build && npm test"
+    "check": "npm run build && npm test",
+    "package:standalone": "scripts/package-standalone.sh"
   },
   "dependencies": {
     "@threadmark/core": "file:../core"

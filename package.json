@@ -10,7 +10,8 @@
   "scripts": {
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
-    "check": "npm run build && npm run test"
+    "check": "npm run build && npm run test",
+    "package:openclaw": "npm run build && npm run package:standalone --workspace=packages/openclaw"
   },
   "openclaw": {
     "hooks": ["./packages/openclaw/dist/hooks/threadmark"],

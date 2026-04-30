@@ -29,6 +29,55 @@ Only the OpenClaw adapter is currently implemented and runtime-verified.
 
 If `OPENCLAW_HOME` is set, Threadmark writes continuity files under that OpenClaw home instead of `~/.openclaw`.
 
+## Install from release archive (standalone — no Git or npm required)
+
+Download `threadmark-openclaw-v0.1.0.tar.gz` from the release page, then:
+
+```sh
+tar -xzf threadmark-openclaw-v0.1.0.tar.gz
+cd threadmark-openclaw-v0.1.0
+./install.sh --dry-run   # preview
+./install.sh --yes       # install
+```
+
+To uninstall:
+
+```sh
+./uninstall.sh --yes
+```
+
+Restart the OpenClaw gateway after install or uninstall to apply changes.
+
+## Local linked development install (contributors)
+
+Requires Node.js ≥ 22.12.0, npm, and TypeScript (installed by `npm install`).
+
+```sh
+git clone <repo>
+cd threadmark
+npm install
+npm run check                                   # build + test
+packages/openclaw/scripts/install.sh --dry-run  # preview
+packages/openclaw/scripts/install.sh --yes --link
+```
+
+To build and validate a standalone release artifact from the repo:
+
+```sh
+npm run check
+npm run package:openclaw
+# outputs dist/threadmark-openclaw-v0.1.0.tar.gz
+
+tar -tzf dist/threadmark-openclaw-v0.1.0.tar.gz
+TMPDIR="$(mktemp -d)"
+tar -xzf dist/threadmark-openclaw-v0.1.0.tar.gz -C "$TMPDIR"
+cd "$TMPDIR/threadmark-openclaw-v0.1.0"
+node --input-type=module -e "await import('@threadmark/core')"
+./install.sh --dry-run
+```
+
+### Local linked runtime validation
+
 1. Run `packages/openclaw/scripts/install.sh --dry-run`.
 2. Run `packages/openclaw/scripts/install.sh --yes --link` for linked local validation.
 3. Restart OpenClaw gateway.
