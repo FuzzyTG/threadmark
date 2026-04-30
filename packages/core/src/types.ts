@@ -20,6 +20,7 @@ export type ActiveContext = {
   current_goal: string;
   status: ContextStatus;
   next_step: string;
+  recent_exchanges?: TranscriptMessage[];
   artifacts: string[];
   updated_at: string;
   confidence: Confidence;

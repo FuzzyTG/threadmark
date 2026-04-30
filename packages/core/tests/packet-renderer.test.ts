@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { MAX_PACKET_BYTES } from "../src/constants.js";
+import { extractContinuityState } from "../src/extractor.js";
 import { renderPacket } from "../src/packet-renderer.js";
 import type { ContinuityState } from "../src/types.js";
 
@@ -46,6 +47,20 @@ test("renderPacket limits artifacts to ten and packet to max bytes", () => {
   assert.ok(Buffer.byteLength(packet, "utf-8") <= MAX_PACKET_BYTES);
 });
 
+test("renderPacket includes recent evidence section when exchanges present", () => {
+  const state = stateWithArtifacts([]);
+  state.active_context!.recent_exchanges = [
+    { role: "user", text: "What is the weather in Sample City tomorrow?" },
+    { role: "assistant", text: "Tomorrow in Sample City will be cloudy, 12-20°C." }
+  ];
+
+  const packet = renderPacket(state);
+
+  assert.match(packet, /Recent evidence:/);
+  assert.match(packet, /user: What is the weather in Sample City tomorrow\?/);
+  assert.match(packet, /assistant: Tomorrow in Sample City will be cloudy/);
+});
+
 test("renderPacket marks stale context", () => {
   const state = stateWithArtifacts([]);
   state.meta.last_capture_status = "partial";
@@ -55,4 +70,28 @@ test("renderPacket marks stale context", () => {
 
   assert.match(packet, /Status: partial/);
   assert.match(packet, /Stale reason: transcript missing/);
+});
+
+test("synthetic issue scenario renders recent evidence with newer exchange dominant", () => {
+  const state = extractContinuityState({
+    eventName: "command:new",
+    sessionId: "session-issue-8",
+    messages: [
+      { role: "user", text: "say it again?" },
+      { role: "assistant", text: "Sure, repeating the greeting..." },
+      { role: "user", text: "What is the weather in Sample City tomorrow?" },
+      { role: "assistant", text: "Tomorrow in Sample City will be cloudy, 12-20°C." }
+    ],
+    now: new Date("2026-04-29T00:00:00.000Z"),
+    status: "success",
+    staleReason: null
+  });
+
+  const packet = renderPacket(state);
+
+  assert.match(packet, /Current goal: What is the weather in Sample City tomorrow\?/);
+  assert.match(packet, /Recent evidence:/);
+  assert.match(packet, /user: What is the weather in Sample City tomorrow\?/);
+  assert.match(packet, /assistant: Tomorrow in Sample City will be cloudy/);
+  assert.ok(Buffer.byteLength(packet, "utf-8") <= MAX_PACKET_BYTES);
 });

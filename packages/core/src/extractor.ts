@@ -2,6 +2,8 @@ import { DEFAULT_VALIDITY_HOURS, MAX_ARTIFACTS, SCHEMA_VERSION } from "./constan
 import { redactSecrets } from "./redaction.js";
 import type { CaptureEvent, CaptureStatus, ContinuityState, TranscriptMessage } from "./types.js";
 
+const DEFAULT_RECENT_EXCHANGES = 3;
+
 function isoPlusHours(now: Date, hours: number): string {
   return new Date(now.getTime() + hours * 60 * 60 * 1000).toISOString();
 }
@@ -14,6 +16,35 @@ function artifactCandidates(messages: TranscriptMessage[]): string[] {
   const text = messages.map((message) => message.text).join("\n");
   const matches = text.match(/[A-Za-z0-9_.\/-]+\.(md|ts|js|json|jsonl|sh|yml|yaml)/g) || [];
   return Array.from(new Set(matches)).slice(0, MAX_ARTIFACTS);
+}
+
+/**
+ * Walk through messages and collect the last N user-led exchanges.
+ * A user-led exchange is a user message followed by zero or more assistant messages
+ * before the next user message. Groups that start with an assistant (no leading
+ * user message) are dropped.
+ */
+function collectRecentExchanges(messages: TranscriptMessage[], maxExchanges: number): TranscriptMessage[] {
+  const exchanges: TranscriptMessage[][] = [];
+  let current: TranscriptMessage[] = [];
+
+  // Walk forward, splitting on user messages
+  for (const msg of messages) {
+    if (msg.role === "user") {
+      if (current.length > 0) exchanges.push(current);
+      current = [msg];
+    } else {
+      // Only add assistant messages to a group that starts with a user message
+      if (current.length > 0 && current[0].role === "user") {
+        current.push(msg);
+      }
+      // Otherwise drop — assistant-only group
+    }
+  }
+  if (current.length > 0 && current[0].role === "user") exchanges.push(current);
+
+  // Take the last N exchanges and flatten back to chronological order
+  return exchanges.slice(-maxExchanges).flat();
 }
 
 export function extractContinuityState(input: {
@@ -42,8 +73,13 @@ export function extractContinuityState(input: {
     return base;
   }
 
-  const summary = summarize(input.messages);
-  const lastAssistant = [...input.messages].reverse().find((message) => message.role === "assistant")?.text || "";
+  const recentExchanges = collectRecentExchanges(input.messages, DEFAULT_RECENT_EXCHANGES);
+  if (recentExchanges.length === 0) return base;
+
+  const redactedExchanges = recentExchanges.map((m) => ({ role: m.role, text: redactSecrets(m.text) }));
+  const summary = summarize(recentExchanges);
+  const lastUser = [...recentExchanges].reverse().find((m) => m.role === "user")?.text || "unknown";
+  const lastAssistant = [...recentExchanges].reverse().find((m) => m.role === "assistant")?.text || "";
 
   return {
     ...base,
@@ -51,9 +87,10 @@ export function extractContinuityState(input: {
       id: `active-${capturedAt}`,
       source_session: input.sessionId || "unknown",
       summary,
-      current_goal: summary.split("\n")[0]?.replace(/^user: /, "") || "unknown",
+      current_goal: redactSecrets(lastUser),
       status: "active",
-      next_step: lastAssistant || "Ask the user what to continue.",
+      next_step: redactSecrets(lastAssistant) || "Ask the user what to continue.",
+      recent_exchanges: redactedExchanges,
       artifacts: artifactCandidates(input.messages),
       updated_at: capturedAt,
       confidence: "medium"

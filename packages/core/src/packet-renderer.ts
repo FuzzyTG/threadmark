@@ -39,7 +39,15 @@ export function renderPacket(state: ContinuityState): string {
       `- Current goal: ${state.active_context.current_goal}`,
       `- Summary: ${state.active_context.summary}`,
       `- Status: ${state.active_context.status}`,
-      `- Next step: ${state.active_context.next_step}`,
+      `- Next step: ${state.active_context.next_step}`
+    );
+    if (state.active_context.recent_exchanges && state.active_context.recent_exchanges.length > 0) {
+      lines.push("- Recent evidence:");
+      for (const msg of state.active_context.recent_exchanges) {
+        lines.push(`  - ${msg.role}: ${msg.text}`);
+      }
+    }
+    lines.push(
       "- Relevant artifacts:",
       bulletList(state.active_context.artifacts),
       `- Updated at: ${state.active_context.updated_at}`,

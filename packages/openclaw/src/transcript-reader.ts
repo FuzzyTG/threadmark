@@ -34,6 +34,9 @@ export async function readTranscriptMessages(filePath: string, maxMessages: numb
   if (maxMessages <= 0) return [];
 
   const messages: TranscriptMessage[] = [];
+  // Track whether the most recent accepted user message was an external human message.
+  // Only assistant messages that follow an accepted external user message are included.
+  let lastAcceptedUserWasExternal = false;
   const lines = readline.createInterface({
     input: fs.createReadStream(filePath, { encoding: "utf-8" }),
     crlfDelay: Infinity
@@ -45,15 +48,33 @@ export async function readTranscriptMessages(filePath: string, maxMessages: numb
     try {
       const entry = JSON.parse(line) as { type?: unknown; message?: { role?: unknown; content?: unknown } };
       if (entry.type !== "message" || !entry.message) continue;
-      if (entry.message.role !== "user") continue;
 
       const text = extractText(entry.message.content);
       if (!text) continue;
-      const userText = extractExternalUserText(text);
-      if (!userText) continue;
-      if (userText.startsWith("/")) continue;
 
-      messages.push({ role: "user", text: userText });
+      if (entry.message.role === "user") {
+        const userText = extractExternalUserText(text);
+        if (!userText) {
+          // Internal/system user message — break the chain so subsequent
+          // assistant replies are not attributed to the previous external user.
+          lastAcceptedUserWasExternal = false;
+          continue;
+        }
+        if (userText.startsWith("/")) {
+          lastAcceptedUserWasExternal = false;
+          continue;
+        }
+        messages.push({ role: "user", text: userText });
+        lastAcceptedUserWasExternal = true;
+      } else if (entry.message.role === "assistant") {
+        if (!lastAcceptedUserWasExternal) continue;
+        const trimmed = text.trim();
+        if (!trimmed) continue;
+        messages.push({ role: "assistant", text: trimmed });
+      } else {
+        continue;
+      }
+
       if (messages.length > maxMessages) messages.shift();
     } catch {
       continue;
