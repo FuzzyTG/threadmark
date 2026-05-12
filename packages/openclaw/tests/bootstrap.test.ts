@@ -62,7 +62,7 @@ test("injectContinuityPacket deletes files after successful injection", async ()
   await fs.access(statePath(base));
 });
 
-test("injectContinuityPacket skips and deletes expired packets", async () => {
+test("injectContinuityPacket skips expired packets", async () => {
   const base = await fs.mkdtemp(path.join(os.tmpdir(), "threadmark-home-"));
   const contDir = path.dirname(packetPath(base));
   await fs.mkdir(contDir, { recursive: true });
@@ -89,9 +89,9 @@ test("injectContinuityPacket skips and deletes expired packets", async () => {
   assert.equal(injected, false);
   assert.deepEqual(context.bootstrapFiles, [{ path: "BOOT.md", content: "boot" }]);
 
-  // Both files should be deleted
-  await assert.rejects(fs.access(packetPath(base)));
-  await assert.rejects(fs.access(statePath(base)));
+  // Files should be retained (next capture overwrites them)
+  await fs.access(packetPath(base));
+  await fs.access(statePath(base));
 });
 
 test("injectContinuityPacket reads from workspace-scoped path", async () => {
