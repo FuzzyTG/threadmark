@@ -37,8 +37,5 @@ export async function injectContinuityPacket(context: BootstrapContext, baseDir?
     }
   ];
 
-  await fs.unlink(packetPath(baseDir)).catch(() => {});
-  await fs.unlink(statePath(baseDir)).catch(() => {});
-
   return true;
 }

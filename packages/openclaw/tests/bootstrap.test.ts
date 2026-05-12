@@ -57,9 +57,9 @@ test("injectContinuityPacket deletes files after successful injection", async ()
 
   assert.equal(injected, true);
 
-  // Both files should be deleted after injection
-  await assert.rejects(fs.access(packetPath(base)));
-  await assert.rejects(fs.access(statePath(base)));
+  // Files should be retained (delete-after-read disabled for debugging)
+  await fs.access(packetPath(base));
+  await fs.access(statePath(base));
 });
 
 test("injectContinuityPacket skips and deletes expired packets", async () => {
@@ -123,7 +123,7 @@ test("injectContinuityPacket reads from workspace-scoped path", async () => {
   assert.equal(context.bootstrapFiles[0].path, "RECENT_CONTEXT.md");
   assert.equal(context.bootstrapFiles[0].content, "# Workspace Context\n");
 
-  // Files should be cleaned up
-  await assert.rejects(fs.access(packetPath(workspace)));
-  await assert.rejects(fs.access(statePath(workspace)));
+  // Files should be retained (delete-after-read disabled for debugging)
+  await fs.access(packetPath(workspace));
+  await fs.access(statePath(workspace));
 });
