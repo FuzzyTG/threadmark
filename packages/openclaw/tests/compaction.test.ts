@@ -83,14 +83,16 @@ test("compaction with only sessionId attempts transcript resolution", async () =
 
 test("compaction accepts OpenClaw single-argument context shape", async () => {
   const base = await makeTmpHome();
+  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "threadmark-ws-"));
 
   await handleCompactionSignal({
     messageCount: 10,
     sessionId: "sess-one-arg",
-    workspaceDir: "/tmp/threadmark-workspace"
+    workspaceDir: workspace
   });
 
-  const state = JSON.parse(await fs.readFile(statePath(base), "utf-8"));
+  // With workspace-scoped paths, state is written under the workspace dir
+  const state = JSON.parse(await fs.readFile(statePath(workspace), "utf-8"));
   assert.equal(state.meta.last_capture_event, "before_compaction");
   assert.equal(state.meta.last_capture_status, "partial");
   assert.equal(state.meta.stale_reason, "transcript missing");
@@ -118,4 +120,86 @@ test("plugin registers before_compaction handler", () => {
   assert.equal(plugin.id, "threadmark");
   assert.equal(calls[0].name, "before_compaction");
   assert.equal(typeof calls[0].handler, "function");
+});
+
+test("handleCompactionSignal with workspaceDir writes to workspace path", async () => {
+  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "threadmark-ws-"));
+  const base = await makeTmpHome();
+
+  await handleCompactionSignal(
+    {
+      messageCount: 1,
+      messages: [
+        { role: "user", content: "Check deployment status" },
+        { role: "assistant", content: "Deployment is healthy." }
+      ]
+    },
+    { workspaceDir: workspace }
+  );
+
+  const wsStatePath = path.join(workspace, "continuity", "state.json");
+  const state = JSON.parse(await fs.readFile(wsStatePath, "utf-8"));
+  assert.equal(state.meta.last_capture_event, "before_compaction");
+  assert.equal(state.meta.last_capture_status, "success");
+
+  // Global path should NOT have state from this call
+  const globalStatePath = statePath(base);
+  await assert.rejects(fs.readFile(globalStatePath, "utf-8"));
+  delete process.env.OPENCLAW_HOME;
+});
+
+test("handleCompactionSignal derives workspace from sessionFile and config", async () => {
+  const base = await makeTmpHome();
+  const sessionFile = path.join(base, "agents", "cto", "sessions", "abc.jsonl");
+
+  const config = {
+    agents: {
+      list: [
+        { id: "main", default: true },
+        { id: "cto" }
+      ]
+    }
+  };
+
+  const expectedWorkspace = path.join(base, "workspace-cto");
+
+  await handleCompactionSignal(
+    {
+      messageCount: 1,
+      messages: [
+        { role: "user", content: "Review the architecture" },
+        { role: "assistant", content: "Architecture looks solid." }
+      ],
+      sessionFile
+    },
+    {},
+    config
+  );
+
+  const wsStatePath = path.join(expectedWorkspace, "continuity", "state.json");
+  const state = JSON.parse(await fs.readFile(wsStatePath, "utf-8"));
+  assert.equal(state.meta.last_capture_event, "before_compaction");
+  assert.equal(state.meta.last_capture_status, "success");
+  delete process.env.OPENCLAW_HOME;
+});
+
+test("handleCompactionSignal without workspaceDir or sessionFile falls back to global", async () => {
+  const base = await makeTmpHome();
+  const config = {
+    agents: {
+      list: [{ id: "main", default: true }]
+    }
+  };
+
+  await handleCompactionSignal(
+    { messageCount: 5, tokenCount: 500 },
+    {},
+    config
+  );
+
+  const state = JSON.parse(await fs.readFile(statePath(base), "utf-8"));
+  assert.equal(state.meta.last_capture_event, "before_compaction");
+  assert.equal(state.meta.last_capture_status, "partial");
+  assert.equal(state.meta.stale_reason, "compaction transcript unavailable");
+  delete process.env.OPENCLAW_HOME;
 });

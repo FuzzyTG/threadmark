@@ -23,7 +23,7 @@ export default async function handler(event: HookEvent): Promise<void> {
   const context = event.context || {};
 
   if (event.type === "agent" && event.action === "bootstrap") {
-    await injectContinuityPacket(context);
+    await injectContinuityPacket(context, context.workspaceDir || undefined);
     return;
   }
 
@@ -33,6 +33,7 @@ export default async function handler(event: HookEvent): Promise<void> {
 
   const session = context.previousSessionEntry || context.sessionEntry || {};
   await captureContinuity({
+    baseDir: context.workspaceDir || undefined,
     eventName,
     sessionId: session.sessionId || null,
     sessionFile: session.sessionFile || null,

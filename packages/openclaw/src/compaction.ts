@@ -1,6 +1,8 @@
 import { extractContinuityState, saveStateAndPacket, type TranscriptMessage } from "@threadmark/core";
 import { captureContinuity } from "./capture.js";
-import { packetPath, statePath } from "./paths.js";
+import { openClawHome, packetPath, statePath } from "./paths.js";
+import type { OpenClawConfig } from "./openclaw-config.js";
+import { resolveWorkspaceFromConfig, deriveAgentIdFromSessionFile } from "./openclaw-config.js";
 
 export type CompactionEvent = {
   messageCount?: number;
@@ -39,11 +41,22 @@ function extractMessages(raw: unknown[]): TranscriptMessage[] {
   return results;
 }
 
+function resolveBaseDir(merged: CompactionEvent & CompactionAgentContext, config?: OpenClawConfig): string | undefined {
+  if (merged.workspaceDir) return merged.workspaceDir;
+  const sessionFile = merged.sessionFile;
+  if (!sessionFile || !config) return undefined;
+  const agentId = deriveAgentIdFromSessionFile(sessionFile);
+  if (!agentId) return undefined;
+  return resolveWorkspaceFromConfig(config, agentId, openClawHome());
+}
+
 export async function handleCompactionSignal(
   event: CompactionEvent,
-  ctx: CompactionAgentContext = {}
+  ctx: CompactionAgentContext = {},
+  config?: OpenClawConfig
 ): Promise<void> {
   const merged = { ...event, ...ctx };
+  const baseDir = resolveBaseDir(merged, config);
 
   // Path 1: messages provided directly (auto-compaction)
   if (Array.isArray(merged.messages) && merged.messages.length > 0) {
@@ -58,13 +71,14 @@ export async function handleCompactionSignal(
       status,
       staleReason
     });
-    await saveStateAndPacket({ stateFile: statePath(), packetFile: packetPath() }, state);
+    await saveStateAndPacket({ stateFile: statePath(baseDir), packetFile: packetPath(baseDir) }, state);
     return;
   }
 
   // Path 2: sessionFile or sessionId available — try transcript resolution
   if (merged.sessionFile || merged.sessionId) {
     await captureContinuity({
+      baseDir,
       eventName: "before_compaction",
       sessionId: merged.sessionId ?? null,
       sessionFile: merged.sessionFile ?? null,
@@ -83,5 +97,5 @@ export async function handleCompactionSignal(
     status: "partial",
     staleReason: "compaction transcript unavailable"
   });
-  await saveStateAndPacket({ stateFile: statePath(), packetFile: packetPath() }, state);
+  await saveStateAndPacket({ stateFile: statePath(baseDir), packetFile: packetPath(baseDir) }, state);
 }
