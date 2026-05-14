@@ -1,4 +1,4 @@
-export type CaptureEvent = "command:new" | "command:reset" | "before_compaction";
+export type CaptureEvent = "command:new" | "command:reset" | "before_compaction" | "session_end";
 export type CaptureStatus = "success" | "failed" | "partial";
 export type ContextStatus = "active" | "blocked" | "unknown";
 export type Confidence = "high" | "medium" | "low";
