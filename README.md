@@ -6,6 +6,23 @@ Threadmark preserves a small active/recent context packet across agent session b
 
 Threadmark does not write archival memory or run `openclaw memory index`.
 
+## Why
+
+Agents lose context when sessions end. A user says "continue" or "do it again" and the new session has no idea what came before. Threadmark solves this by capturing just enough recent context — the last few exchanges, the current goal, relevant artifacts — and injecting it at session start.
+
+Threadmark is the short-term memory layer. Pairs with [Engrams](https://github.com/FuzzyTG/Engrams) for long-term knowledge retention.
+
+### ThreadMark vs Engrams
+
+| | ThreadMark | Engrams |
+|---|---|---|
+| Question it answers | "Where was I?" | "What should I know?" |
+| Memory type | Short-term | Long-term |
+| Scope | Last few exchanges | Accumulated knowledge |
+| Ownership | Per-agent, isolated | Cross-agent, shared |
+| Lifespan | 24 hours | Durable (evergreen or time-windowed) |
+| Trigger | Vague follow-ups ("continue", "do it again") | Every message (active matching) |
+
 ## How it works
 
 - Managed hook id: `threadmark`
